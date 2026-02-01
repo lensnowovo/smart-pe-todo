@@ -841,9 +841,9 @@ function App() {
       : activeTasks
 
   return (
-    <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-900)]">
+    <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-900)] overflow-hidden">
       <div className="flex min-h-screen">
-        <aside className="w-72 bg-[var(--navy-950)] text-slate-100 flex flex-col px-5 py-6 h-screen">
+        <aside className="w-72 bg-[var(--navy-950)] text-slate-100 flex flex-col px-5 py-6 h-full">
           <div>
             <div className="flex items-center gap-3 mb-8">
               <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center">
@@ -921,7 +921,7 @@ function App() {
           </div>
         </aside>
 
-        <main className="flex-1 bg-[var(--surface-0)] overflow-x-hidden overflow-y-auto h-screen">
+        <main className="flex-1 bg-[var(--surface-0)] overflow-x-hidden overflow-y-auto">
           {updateStatus.state === 'available' && (
             <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-xs text-amber-700">
               发现新版本，前往设置页手动下载更新。
