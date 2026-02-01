@@ -4,6 +4,12 @@ const path = require('path')
 const fs = require('fs')
 
 const CONFIG_FILE = 'pe-fund-ops.config.json'
+const STORAGE_FILES = {
+  'pe-fund-ops.tasks': 'pe-fund-ops.tasks.json',
+  'pe-fund-ops.gamification': 'pe-fund-ops.gamification.json',
+  'pe-fund-ops.context': 'pe-fund-ops.context.json',
+  'pe-fund-ops.templates': 'pe-fund-ops.templates.json',
+}
 
 const readConfig = () => {
   try {
@@ -19,6 +25,35 @@ const readConfig = () => {
 const writeConfig = (data) => {
   const configPath = path.join(app.getPath('userData'), CONFIG_FILE)
   fs.writeFileSync(configPath, JSON.stringify(data, null, 2), 'utf-8')
+}
+
+const resolveStorePath = (key) => {
+  const fileName = STORAGE_FILES[key]
+  if (!fileName) return null
+  return path.join(app.getPath('userData'), fileName)
+}
+
+const readStore = (key) => {
+  try {
+    const storePath = resolveStorePath(key)
+    if (!storePath) return null
+    if (!fs.existsSync(storePath)) return null
+    const raw = fs.readFileSync(storePath, 'utf-8')
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+const writeStore = (key, data) => {
+  try {
+    const storePath = resolveStorePath(key)
+    if (!storePath) return false
+    fs.writeFileSync(storePath, JSON.stringify(data ?? null, null, 2), 'utf-8')
+    return true
+  } catch {
+    return false
+  }
 }
 
 const createWindow = () => {
@@ -77,6 +112,14 @@ app.whenReady().then(() => {
   ipcMain.handle('config:set', (_event, data) => {
     writeConfig(data || {})
     return true
+  })
+
+  ipcMain.on('storage:getSync', (event, key) => {
+    event.returnValue = readStore(key)
+  })
+
+  ipcMain.on('storage:setSync', (event, key, data) => {
+    event.returnValue = writeStore(key, data)
   })
 
   ipcMain.handle('update:check', async () => {

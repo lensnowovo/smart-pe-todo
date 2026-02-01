@@ -338,6 +338,22 @@ function App() {
   // Data state with repository
   const [tasks, setTasks] = useState(() => loadTasks() || sampleTasks())
   const [contextData, setContextData] = useState(() => {
+    if (window.electronAPI?.getStoreSync) {
+      const stored = window.electronAPI.getStoreSync(CONTEXT_KEY)
+      if (stored !== null && stored !== undefined) return stored
+      const raw = localStorage.getItem(CONTEXT_KEY)
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw)
+          window.electronAPI.setStoreSync(CONTEXT_KEY, parsed)
+          localStorage.removeItem(CONTEXT_KEY)
+          return parsed
+        } catch {
+          return { funds: [] }
+        }
+      }
+      return { funds: [] }
+    }
     const stored = localStorage.getItem(CONTEXT_KEY)
     if (stored) {
       try {
@@ -349,6 +365,22 @@ function App() {
     return { funds: [] }
   })
   const [templates, setTemplates] = useState(() => {
+    if (window.electronAPI?.getStoreSync) {
+      const stored = window.electronAPI.getStoreSync(TEMPLATES_KEY)
+      if (stored !== null && stored !== undefined) return stored
+      const raw = localStorage.getItem(TEMPLATES_KEY)
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw)
+          window.electronAPI.setStoreSync(TEMPLATES_KEY, parsed)
+          localStorage.removeItem(TEMPLATES_KEY)
+          return parsed
+        } catch {
+          return []
+        }
+      }
+      return []
+    }
     const stored = localStorage.getItem(TEMPLATES_KEY)
     if (stored) {
       try {
@@ -380,10 +412,18 @@ function App() {
 
 
   useEffect(() => {
+    if (window.electronAPI?.setStoreSync) {
+      window.electronAPI.setStoreSync(CONTEXT_KEY, contextData)
+      return
+    }
     localStorage.setItem(CONTEXT_KEY, JSON.stringify(contextData))
   }, [contextData])
 
   useEffect(() => {
+    if (window.electronAPI?.setStoreSync) {
+      window.electronAPI.setStoreSync(TEMPLATES_KEY, templates)
+      return
+    }
     localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates))
   }, [templates])
 

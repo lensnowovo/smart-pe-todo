@@ -11,6 +11,25 @@ const CURRENT_VERSION = 1
  * Load gamification data from localStorage
  */
 export const loadGamificationData = () => {
+  if (typeof window !== 'undefined' && window.electronAPI?.getStoreSync) {
+    const stored = window.electronAPI.getStoreSync(GAMIFICATION_KEY)
+    if (stored !== null && stored !== undefined) {
+      return migrateGamificationData(stored)
+    }
+    try {
+      const raw = localStorage.getItem(GAMIFICATION_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        const migrated = migrateGamificationData(parsed)
+        window.electronAPI.setStoreSync(GAMIFICATION_KEY, migrated)
+        localStorage.removeItem(GAMIFICATION_KEY)
+        return migrated
+      }
+    } catch (error) {
+      console.error('Failed to migrate gamification data:', error)
+    }
+    return initializeGamificationData()
+  }
   try {
     const stored = localStorage.getItem(GAMIFICATION_KEY)
     if (stored) {
@@ -28,6 +47,14 @@ export const loadGamificationData = () => {
  * Save gamification data to localStorage
  */
 export const saveGamificationData = (data) => {
+  if (typeof window !== 'undefined' && window.electronAPI?.setStoreSync) {
+    try {
+      return window.electronAPI.setStoreSync(GAMIFICATION_KEY, data)
+    } catch (error) {
+      console.error('Failed to save gamification data to userData store:', error)
+      return false
+    }
+  }
   try {
     localStorage.setItem(GAMIFICATION_KEY, JSON.stringify(data))
     return true

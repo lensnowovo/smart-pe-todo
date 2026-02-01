@@ -11,6 +11,22 @@ const STORAGE_KEY = 'pe-fund-ops.tasks'
  * Load all tasks from storage
  */
 export const loadTasks = () => {
+  if (typeof window !== 'undefined' && window.electronAPI?.getStoreSync) {
+    const stored = window.electronAPI.getStoreSync(STORAGE_KEY)
+    if (stored !== null && stored !== undefined) return stored
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        window.electronAPI.setStoreSync(STORAGE_KEY, parsed)
+        localStorage.removeItem(STORAGE_KEY)
+        return parsed
+      }
+    } catch (error) {
+      console.error('Failed to migrate tasks from localStorage:', error)
+    }
+    return []
+  }
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
@@ -26,6 +42,14 @@ export const loadTasks = () => {
  * Save all tasks to storage
  */
 export const saveTasks = (tasks) => {
+  if (typeof window !== 'undefined' && window.electronAPI?.setStoreSync) {
+    try {
+      return window.electronAPI.setStoreSync(STORAGE_KEY, tasks)
+    } catch (error) {
+      console.error('Failed to save tasks to userData store:', error)
+      return false
+    }
+  }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
     return true

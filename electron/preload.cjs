@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearApiKey: () => ipcRenderer.invoke('config:clearApiKey'),
   getConfig: () => ipcRenderer.invoke('config:get'),
   setConfig: (config) => ipcRenderer.invoke('config:set', config),
+  getStoreSync: (key) => ipcRenderer.sendSync('storage:getSync', key),
+  setStoreSync: (key, data) => ipcRenderer.sendSync('storage:setSync', key, data),
   checkForUpdates: () => ipcRenderer.invoke('update:check'),
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
