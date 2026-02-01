@@ -50,7 +50,8 @@
     "publish": {
       "provider": "github",
       "owner": "lensnowovo",
-      "repo": "smart-pe-todo"
+      "repo": "smart-pe-todo",
+      "releaseType": "release"
     },
     "win": {
       "target": "nsis",
