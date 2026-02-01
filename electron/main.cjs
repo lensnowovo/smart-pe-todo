@@ -103,7 +103,7 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  autoUpdater.autoDownload = false
+  autoUpdater.autoDownload = true
 
   autoUpdater.on('checking-for-update', () => {
     sendUpdateStatus({ state: 'checking' })
