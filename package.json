@@ -42,10 +42,20 @@
   "build": {
     "appId": "com.smarttodo.peops",
     "productName": "PE Ops Task Center",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**",
       "electron/**",
       "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/**/*.node"
     ],
     "publish": {
       "provider": "github",
@@ -54,8 +64,27 @@
       "releaseType": "release"
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "compression": "maximum",
+      "sign": null,
       "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }
