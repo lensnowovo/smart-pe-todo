@@ -843,7 +843,7 @@ function App() {
   return (
     <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-900)] overflow-hidden">
       <div className="flex min-h-screen">
-        <aside className="w-72 bg-[var(--navy-950)] text-slate-100 flex flex-col px-5 py-6 h-full">
+        <aside className="w-auto max-w-[280px] bg-[var(--navy-950)] text-slate-100 flex flex-col px-5 py-6 h-full transition-all duration-300">
           <div>
             <div className="flex items-center gap-3 mb-8">
               <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center">
