@@ -1,7 +1,7 @@
 {
   "name": "pe-fund-ops-todo",
   "private": true,
-  "version": "0.0.5",
+  "version": "0.0.8",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
