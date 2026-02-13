@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm run build:*)",
-      "Bash(npm run electron:build:*)"
+      "Bash(npm run electron:build:*)",
+      "Bash(PATH=\"/d/99-system/System/nodejs/dist/current:$PATH\" \"/d/99-system/System/nodejs/dist/current/npm.cmd\" run:*)",
+      "Bash(\"/d/99-system/System/nodejs/dist/current/node.exe\" .)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

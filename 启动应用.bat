@@ -1,2 +1,2 @@
 @echo off
-start "" "%~dp0dist\win-unpacked\PE Ops Task Center.exe"
+start "" "%~dp0release\win-unpacked\PE Ops Task Center.exe"
