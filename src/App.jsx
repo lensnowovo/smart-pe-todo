@@ -245,7 +245,12 @@ function Calendar({ selectedDate, onSelectDate, tasks }) {
   }, [selectedDate])
 
   const taskDateSet = useMemo(() => {
-    return new Set(tasks.filter((task) => task.dueDate).map((task) => task.dueDate))
+    const dates = new Set()
+    tasks.forEach((task) => {
+      if (task.dueDate && !task.completed) dates.add(task.dueDate)
+      if (task.completed && task.completedDate) dates.add(task.completedDate)
+    })
+    return dates
   }, [tasks])
 
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 })
@@ -334,6 +339,7 @@ function App() {
   })
   const [batchPicker, setBatchPicker] = useState({ open: false, tasks: [] })
   const [calendarModalDate, setCalendarModalDate] = useState(null)
+  const [calendarModalTaskId, setCalendarModalTaskId] = useState(null)
 
   // Data state with repository
   const [tasks, setTasks] = useState(() => loadTasks() || sampleTasks())
@@ -614,6 +620,32 @@ function App() {
     )
   }
 
+  const handleUpdateTaskTags = (taskId, tags) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? TaskOperations.updateTags(task, tags) : t
+      )
+    )
+  }
+
+  const handleUpdateTaskDueDate = (taskId, dueDate) => {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId ? TaskOperations.updateDueDate(task, dueDate) : task
+      )
+    )
+  }
+
+  const handleUpdateTaskTitle = (taskId, title) => {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId ? TaskOperations.updateTitle(task, title) : task
+      )
+    )
+  }
+
   const handleUpdateTaskStatus = (taskId, status) => {
     setTasks((prev) =>
       prev.map((task) =>
@@ -807,7 +839,22 @@ function App() {
 
   const tasksForDate = (date) => {
     const dayKey = format(date, 'yyyy-MM-dd')
-    return tasks.filter((task) => task.dueDate === dayKey && shouldShowTask(task, dayKey))
+
+    const dueTasks = tasks
+      .filter((task) => task.dueDate === dayKey && !task.completed)
+      .map((task) => ({
+        ...task,
+        calendarType: 'due',
+      }))
+
+    const completedTasks = tasks
+      .filter((task) => task.completed && task.completedDate === dayKey)
+      .map((task) => ({
+        ...task,
+        calendarType: 'completed',
+      }))
+
+    return [...dueTasks, ...completedTasks]
   }
 
   const todayCompletedTasks = todayAllTasks.filter((task) => task.completed)
@@ -838,12 +885,14 @@ function App() {
     ? applyQuickFilter(tasks.filter((task) => shouldShowTask(task, todayKey)))
     : view === 'matrix'
       ? allActiveTasks
-      : activeTasks
+      : view === 'funds'
+        ? tasks
+        : activeTasks
 
   return (
-    <div className="min-h-screen bg-[var(--surface-0)] text-[var(--text-900)] overflow-hidden">
-      <div className="flex min-h-screen">
-        <aside className="w-auto max-w-[280px] bg-[var(--navy-950)] text-slate-100 flex flex-col px-5 py-6 h-full transition-all duration-300">
+    <div className="h-screen bg-[var(--surface-0)] text-[var(--text-900)] overflow-hidden">
+      <div className="flex h-full min-h-0">
+        <aside className="w-[280px] shrink-0 bg-[var(--navy-950)] text-slate-100 flex flex-col px-5 py-6 h-full overflow-y-auto transition-all duration-300">
           <div>
             <div className="flex items-center gap-3 mb-8">
               <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center">
@@ -921,7 +970,7 @@ function App() {
           </div>
         </aside>
 
-        <main className="flex-1 bg-[var(--surface-0)] overflow-x-hidden overflow-y-auto">
+        <main className="flex-1 min-w-0 min-h-0 bg-[var(--surface-0)] overflow-x-hidden overflow-y-auto">
           {updateStatus.state === 'available' && (
             <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 text-xs text-amber-700">
               发现新版本，前往设置页手动下载更新。
@@ -1048,10 +1097,12 @@ function App() {
               <CalendarView
                 selectedDate={selectedDate}
                 onSelectDate={setSelectedDate}
-                tasks={tasks}
                 tasksForDate={tasksForDate}
                 onMoveTaskDate={handleMoveTaskDate}
-                onOpenDate={(date) => setCalendarModalDate(date)}
+                onOpenDate={(date, taskId = null) => {
+                  setCalendarModalDate(date)
+                  setCalendarModalTaskId(taskId)
+                }}
               />
             ) : view === 'today' ? (
               <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -1147,6 +1198,8 @@ function App() {
                   onClearChecklist={handleClearChecklist}
                   onDeleteTask={handleDeleteTask}
                   onUpdateTaskFund={handleUpdateTaskFund}
+                  onUpdateTaskTags={handleUpdateTaskTags}
+                  onUpdateTaskDueDate={handleUpdateTaskDueDate}
                   onUpdateTaskStatus={handleUpdateTaskStatus}
                   onUpdateTaskWaitingOn={handleUpdateTaskWaitingOn}
                   onUpdateTaskFollowUpDate={handleUpdateTaskFollowUpDate}
@@ -1181,7 +1234,16 @@ function App() {
         open={Boolean(calendarModalDate)}
         date={calendarModalDate}
         tasks={calendarModalDate ? tasksForDate(calendarModalDate) : []}
-        onClose={() => setCalendarModalDate(null)}
+        focusedTaskId={calendarModalTaskId}
+        onClose={() => {
+          setCalendarModalDate(null)
+          setCalendarModalTaskId(null)
+        }}
+        onToggleTask={handleToggleTask}
+        onUpdateTaskTitle={handleUpdateTaskTitle}
+        onUpdateTaskFund={handleUpdateTaskFund}
+        onUpdateTaskDueDate={handleUpdateTaskDueDate}
+        onUpdateTaskTags={handleUpdateTaskTags}
       />
 
       {/* Achievement Notifications */}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, Circle, Pencil, Trash2, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, Pencil, Trash2, X } from 'lucide-react'
 import CardShell from './CardShell'
 
 const SLA_KEYWORDS = /(capital call|quarterly report|kyc|tax filing|报税|税务)/i
@@ -36,6 +36,8 @@ function TaskCard({
   onClearChecklist,
   onDeleteTask,
   onUpdateTaskFund,
+  onUpdateTaskTags,
+  onUpdateTaskDueDate,
   daysUntil,
 }) {
   const [editing, setEditing] = useState({ taskId: null, itemId: null })
@@ -44,7 +46,19 @@ function TaskCard({
   const [editingFund, setEditingFund] = useState(false)
   const [fundDraft, setFundDraft] = useState('')
   const fundInputRef = useRef(null)
+  const [editingTagIndex, setEditingTagIndex] = useState(-1)
+  const [addingTag, setAddingTag] = useState(false)
+  const [tagDraft, setTagDraft] = useState('')
+  const tagInputRef = useRef(null)
+  const [editingDueDate, setEditingDueDate] = useState(false)
+  const [dueDateDraft, setDueDateDraft] = useState(task.dueDate || '')
+  const [showQuickAddMenu, setShowQuickAddMenu] = useState(false)
+  const quickAddMenuRef = useRef(null)
+  const [showUrgencyMenu, setShowUrgencyMenu] = useState(false)
+  const urgencyMenuRef = useRef(null)
+  const [collapsed, setCollapsed] = useState(false)
   const fundList = task.funds?.length ? task.funds : task.fund ? [task.fund] : []
+  const tags = task.tags || []
   const riskLevel = getRiskLevel(task, daysUntil)
   const riskTagClass = riskLevel ? riskTagStyles[riskLevel] : ''
   const urgencyLabel = (() => {
@@ -73,6 +87,57 @@ function TaskCard({
     setFundDraft('')
   }
 
+  const commitTagDraft = () => {
+    if (editingTagIndex < 0) return
+    const cleaned = tagDraft.trim()
+    const nextTags = [...tags]
+    if (cleaned) {
+      nextTags[editingTagIndex] = cleaned
+    } else {
+      nextTags.splice(editingTagIndex, 1)
+    }
+    onUpdateTaskTags(task.id, nextTags)
+    setEditingTagIndex(-1)
+    setTagDraft('')
+  }
+
+  const commitAddTag = () => {
+    if (!addingTag) return
+    const cleaned = tagDraft.trim()
+    if (cleaned && !tags.includes(cleaned)) {
+      onUpdateTaskTags(task.id, [...tags, cleaned])
+    }
+    setAddingTag(false)
+    setTagDraft('')
+  }
+
+  const commitDueDateDraft = () => {
+    if (!editingDueDate) return
+    onUpdateTaskDueDate(task.id, dueDateDraft)
+    setEditingDueDate(false)
+  }
+
+  const toISODate = (date) => {
+    const pad = (value) => String(value).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+  }
+
+  const updateUrgency = (level) => {
+    const today = new Date()
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    if (level === 'urgent') {
+      onUpdateTaskDueDate(task.id, toISODate(start))
+      return
+    }
+    if (level === 'overdue') {
+      const yesterday = new Date(start)
+      yesterday.setDate(yesterday.getDate() - 1)
+      onUpdateTaskDueDate(task.id, toISODate(yesterday))
+      return
+    }
+    onUpdateTaskDueDate(task.id, '')
+  }
+
   useEffect(() => {
     if (!editingFund) return
     const handleClickOutside = (event) => {
@@ -97,7 +162,125 @@ function TaskCard({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [editing.itemId, draft])
 
+  useEffect(() => {
+    if (editingTagIndex < 0 && !addingTag) return
+    const handleClickOutside = (event) => {
+      if (!tagInputRef.current) return
+      if (tagInputRef.current.contains(event.target)) return
+      if (editingTagIndex >= 0) {
+        commitTagDraft()
+      } else {
+        commitAddTag()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [editingTagIndex, addingTag, tagDraft, tags])
+
+  useEffect(() => {
+    if (editingDueDate) return
+    setDueDateDraft(task.dueDate || '')
+  }, [task.dueDate, editingDueDate])
+
+  useEffect(() => {
+    if (!showQuickAddMenu) return
+    const handleClickOutside = (event) => {
+      if (!quickAddMenuRef.current) return
+      if (quickAddMenuRef.current.contains(event.target)) return
+      setShowQuickAddMenu(false)
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showQuickAddMenu])
+
+  useEffect(() => {
+    if (!showUrgencyMenu) return
+    const handleClickOutside = (event) => {
+      if (!urgencyMenuRef.current) return
+      if (urgencyMenuRef.current.contains(event.target)) return
+      setShowUrgencyMenu(false)
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showUrgencyMenu])
+
   const checklistTotal = task.checklist?.length || 0
+
+  if (collapsed) {
+    return (
+      <CardShell className="h-auto">
+        <div className="p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-2">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onToggleTask(task.id)
+                }}
+                className="mt-0.5 text-[var(--accent)]"
+                aria-label="Toggle task"
+              >
+                {task.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+              </button>
+              <p
+                className={`min-w-0 truncate text-sm font-semibold ${
+                  task.completed ? 'line-through text-[var(--text-500)]' : 'text-[var(--text-900)]'
+                }`}
+              >
+                {task.title}
+              </p>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setCollapsed(false)
+                }}
+                className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
+                aria-label="展开任务卡片"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onDeleteTask(task.id)
+                }}
+                className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-rose-600"
+                aria-label="删除任务"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-500)]">
+            {(fundList[0] || '未设置基金') && (
+              <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5">
+                {fundList[0] || '未设置基金'}
+              </span>
+            )}
+            <span className={`rounded-full border px-2 py-0.5 ${riskTagClass || 'border-[var(--border)]'}`}>
+              {urgencyLabel}
+            </span>
+            {task.dueDate && (
+              <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5">
+                DDL {task.dueDate}
+              </span>
+            )}
+            {checklistTotal > 0 && (
+              <span className="rounded-full border border-[var(--border)] bg-white px-2 py-0.5">
+                子任务 {checklistTotal}
+              </span>
+            )}
+          </div>
+        </div>
+      </CardShell>
+    )
+  }
+
   return (
     <CardShell>
       <div className="shrink-0 p-4">
@@ -128,6 +311,16 @@ function TaskCard({
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-[var(--text-500)]">
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                setCollapsed((prev) => !prev)
+              }}
+              className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
+              aria-label={collapsed ? '展开任务卡片' : '折叠任务卡片'}
+            >
+              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
             <button
               onClick={(event) => {
                 event.stopPropagation()
@@ -179,14 +372,18 @@ function TaskCard({
               <span>{fundList[0] || '添加基金'}</span>
             </button>
           ) : (
-            fundList.map((fundName) => (
-              <span
-                key={fundName}
-                className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-[var(--text-500)]"
-              >
-                {fundName}
-              </span>
-            ))
+            <button
+              onDoubleClick={(event) => {
+                event.stopPropagation()
+                setEditingFund(true)
+                setFundDraft(fundList[0] || '')
+              }}
+              onClick={(event) => event.stopPropagation()}
+              className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-[var(--text-500)] hover:border-[var(--accent)]/40 hover:text-[var(--text-900)]"
+              aria-label="双击编辑基金归属"
+            >
+              <span>{fundList.join(', ')}</span>
+            </button>
           )}
           {task.portfolio?.map((name) => (
             <span
@@ -201,13 +398,193 @@ function TaskCard({
               高优先级
             </span>
           )}
-          <span
-            className={`rounded-full border px-2 py-1 ${
-              riskTagClass || 'border-[var(--border)]'
-            }`}
-          >
-            {urgencyLabel}
-          </span>
+          <div ref={urgencyMenuRef} className="relative">
+            <button
+              onDoubleClick={(event) => {
+                event.stopPropagation()
+                setShowUrgencyMenu((prev) => !prev)
+              }}
+              onClick={(event) => event.stopPropagation()}
+              className={`rounded-full border px-2 py-1 ${
+                riskTagClass || 'border-[var(--border)]'
+              }`}
+              aria-label="双击编辑紧急程度"
+            >
+              {urgencyLabel}
+            </button>
+            {showUrgencyMenu && (
+              <div className="absolute left-0 top-8 z-20 w-28 rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setShowUrgencyMenu(false)
+                    updateUrgency('urgent')
+                  }}
+                  className="w-full rounded-md px-2 py-1 text-left text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)]"
+                >
+                  紧急
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setShowUrgencyMenu(false)
+                    updateUrgency('not_urgent')
+                  }}
+                  className="w-full rounded-md px-2 py-1 text-left text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)]"
+                >
+                  不紧急
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setShowUrgencyMenu(false)
+                    updateUrgency('overdue')
+                  }}
+                  className="w-full rounded-md px-2 py-1 text-left text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)]"
+                >
+                  逾期
+                </button>
+              </div>
+            )}
+          </div>
+          {editingDueDate ? (
+            <input
+              type="date"
+              value={dueDateDraft}
+              autoFocus
+              onChange={(event) => setDueDateDraft(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              onBlur={() => commitDueDateDraft()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitDueDateDraft()
+                if (event.key === 'Escape') {
+                  setDueDateDraft(task.dueDate || '')
+                  setEditingDueDate(false)
+                }
+              }}
+              className="rounded-full border border-[var(--border)] bg-white px-2 py-1 text-xs text-[var(--text-700)]"
+              aria-label="编辑截止日期"
+            />
+          ) : task.dueDate ? (
+            <button
+              onDoubleClick={(event) => {
+                event.stopPropagation()
+                setEditingDueDate(true)
+              }}
+              onClick={(event) => event.stopPropagation()}
+              className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 hover:border-[var(--accent)]/40 hover:text-[var(--text-900)]"
+              aria-label="双击编辑截止日期"
+            >
+              DDL {task.dueDate}
+            </button>
+          ) : null}
+          {tags.map((tag, index) =>
+            editingTagIndex === index ? (
+              <input
+                key={`${task.id}-tag-edit-${index}`}
+                ref={tagInputRef}
+                value={tagDraft}
+                autoFocus
+                onChange={(event) => setTagDraft(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') commitTagDraft()
+                  if (event.key === 'Escape') {
+                    setEditingTagIndex(-1)
+                    setTagDraft('')
+                  }
+                }}
+                className="rounded-full border border-[var(--border)] bg-white px-2 py-1 text-xs text-[var(--text-700)]"
+                placeholder="标签"
+              />
+            ) : (
+              <span
+                key={`${task.id}-tag-${index}-${tag}`}
+                className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-sky-700"
+              >
+                <button
+                  onDoubleClick={(event) => {
+                    event.stopPropagation()
+                    setAddingTag(false)
+                    setEditingTagIndex(index)
+                    setTagDraft(tag)
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                  className="max-w-36 truncate"
+                  aria-label="双击编辑标签"
+                >
+                  {tag}
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onUpdateTaskTags(task.id, tags.filter((item) => item !== tag))
+                  }}
+                  className="rounded-full p-0.5 hover:bg-sky-100"
+                  aria-label="删除标签"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )
+          )}
+          {addingTag ? (
+            <input
+              ref={tagInputRef}
+              value={tagDraft}
+              autoFocus
+              onChange={(event) => setTagDraft(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitAddTag()
+                if (event.key === 'Escape') {
+                  setAddingTag(false)
+                  setTagDraft('')
+                }
+              }}
+              className="rounded-full border border-[var(--border)] bg-white px-2 py-1 text-xs text-[var(--text-700)]"
+              placeholder="新增标签"
+            />
+          ) : (
+            <div ref={quickAddMenuRef} className="relative">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setShowQuickAddMenu((prev) => !prev)
+                }}
+                className="rounded-full border border-dashed border-[var(--border)] bg-white px-2 py-1 text-xs text-[var(--text-500)] hover:border-[var(--accent)]/40 hover:text-[var(--text-900)]"
+                aria-label="新增项"
+              >
+                +
+              </button>
+              {showQuickAddMenu && (
+                <div className="absolute left-0 top-8 z-20 w-24 rounded-lg border border-[var(--border)] bg-white p-1 shadow-lg">
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setShowQuickAddMenu(false)
+                      setEditingTagIndex(-1)
+                      setAddingTag(true)
+                      setTagDraft('')
+                    }}
+                    className="w-full rounded-md px-2 py-1 text-left text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)]"
+                  >
+                    +标签
+                  </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setShowQuickAddMenu(false)
+                      setEditingDueDate(true)
+                    }}
+                    className="w-full rounded-md px-2 py-1 text-left text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)]"
+                  >
+                    +DDL
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {checklistTotal > 0 && (
@@ -414,6 +791,66 @@ function GroupModal({ open, group, onClose, children }) {
   )
 }
 
+function MatrixTaskItem({ task, onToggleTask, onDeleteTask, daysUntil }) {
+  const fundList = task.funds?.length ? task.funds : task.fund ? [task.fund] : []
+  const dueText = (() => {
+    if (!task.dueDate) return '无截止日期'
+    const days = daysUntil(task.dueDate)
+    if (days === null) return task.dueDate
+    if (days < 0) return `已逾期 ${Math.abs(days)} 天`
+    if (days === 0) return '今天截止'
+    return `${days} 天后截止`
+  })()
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-white px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <button
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleTask(task.id)
+          }}
+          className="mt-0.5 text-[var(--accent)]"
+          aria-label="Toggle task"
+        >
+          {task.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+        </button>
+        <p
+          className={`flex-1 text-sm leading-5 ${
+            task.completed ? 'line-through text-[var(--text-500)]' : 'text-[var(--text-900)]'
+          } truncate`}
+        >
+          {task.title}
+        </p>
+        <button
+          onClick={(event) => {
+            event.stopPropagation()
+            onDeleteTask(task.id)
+          }}
+          className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-rose-600"
+          aria-label="删除任务"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center gap-2 pl-6 text-xs text-[var(--text-500)]">
+        <span>{dueText}</span>
+        {fundList[0] && (
+          <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5">
+            {fundList[0]}
+          </span>
+        )}
+        {task.priority === 'high' && (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">
+            高优先级
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function TaskList({
   view,
   tasks,
@@ -427,9 +864,13 @@ function TaskList({
   onClearChecklist,
   onDeleteTask,
   onUpdateTaskFund,
+  onUpdateTaskTags,
+  onUpdateTaskDueDate,
   daysUntil,
 }) {
   const [openGroupId, setOpenGroupId] = useState(null)
+  const [collapsedFunds, setCollapsedFunds] = useState({})
+  const [fundTimeFilter, setFundTimeFilter] = useState('all')
 
   const riskSummary = useMemo(() => {
     const counts = { overdue: 0, t1: 0, t3: 0, t7: 0 }
@@ -464,6 +905,42 @@ function TaskList({
 
   const openGroup = openGroupId ? groupedList.map.get(openGroupId) : null
   const openGroupTitle = openGroup?.[0]?.title || '批次任务'
+
+  const parseTaskDate = (task) => {
+    const raw = task.completedDate || task.createdDate || (task.createdAt ? String(task.createdAt).slice(0, 10) : '')
+    if (!raw) return null
+    const date = new Date(`${raw}T00:00:00`)
+    if (Number.isNaN(date.getTime())) return null
+    return date
+  }
+
+  const isInCurrentWeek = (date) => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const mondayOffset = (today.getDay() + 6) % 7
+    const weekStart = new Date(today)
+    weekStart.setDate(today.getDate() - mondayOffset)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    return date >= weekStart && date <= weekEnd
+  }
+
+  const filterTaskByTime = (task) => {
+    if (!task.completed) return true
+    if (fundTimeFilter === 'all') return true
+    const date = parseTaskDate(task)
+    if (!date) return false
+    const now = new Date()
+
+    if (fundTimeFilter === 'week') return isInCurrentWeek(date)
+    if (fundTimeFilter === 'month') {
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+    }
+    if (fundTimeFilter === 'year') {
+      return date.getFullYear() === now.getFullYear()
+    }
+    return true
+  }
   if (view === 'matrix') {
     const quadrants = [
       {
@@ -523,15 +1000,10 @@ function TaskList({
                   }}
                   className="cursor-grab active:cursor-grabbing"
                 >
-                  <TaskCard
+                  <MatrixTaskItem
                     task={task}
                     onToggleTask={onToggleTask}
-                    onToggleChecklist={onToggleChecklist}
-                    onUpdateChecklistItem={onUpdateChecklistItem}
-                    onDeleteChecklistItem={onDeleteChecklistItem}
-                    onClearChecklist={onClearChecklist}
                     onDeleteTask={onDeleteTask}
-                    onUpdateTaskFund={onUpdateTaskFund}
                     daysUntil={daysUntil}
                   />
                 </div>
@@ -544,36 +1016,79 @@ function TaskList({
   }
 
   if (view === 'funds') {
+    const filterOptions = [
+      { key: 'all', label: '全部' },
+      { key: 'week', label: '本周' },
+      { key: 'month', label: '本月' },
+      { key: 'year', label: '本年度' },
+    ]
     const fundEntries = Object.entries(funds)
+      .map(([fund, items]) => [fund, items.filter(filterTaskByTime)])
+      .filter(([, items]) => items.length > 0)
+
     return (
       <div className="grid gap-4">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] p-3">
+          {filterOptions.map((option) => (
+            <button
+              key={option.key}
+              onClick={() => setFundTimeFilter(option.key)}
+              className={`rounded-full px-3 py-1.5 text-xs transition ${
+                fundTimeFilter === option.key
+                  ? 'border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)]'
+                  : 'border border-[var(--border)] bg-white text-[var(--text-500)] hover:text-[var(--text-900)]'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         {fundEntries.length === 0 && (
           <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-1)] p-6 text-sm text-[var(--text-500)]">
-            暂无关联基金的任务。
+            当前筛选条件下暂无关联基金任务。
           </div>
         )}
         {fundEntries.map(([fund, items]) => (
           <div key={fund} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-1)] p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[var(--text-900)]">{fund}</p>
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() =>
+                  setCollapsedFunds((prev) => ({
+                    ...prev,
+                    [fund]: !prev[fund],
+                  }))
+                }
+                className="flex items-center gap-2 text-left"
+              >
+                {collapsedFunds[fund] ? (
+                  <ChevronRight className="h-4 w-4 text-[var(--text-500)]" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-[var(--text-500)]" />
+                )}
+                <p className="text-sm font-semibold text-[var(--text-900)]">{fund}</p>
+              </button>
               <span className="text-xs text-[var(--text-500)]">{items.length}</span>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 items-start">
-              {items.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onToggleTask={onToggleTask}
-                  onToggleChecklist={onToggleChecklist}
-                  onUpdateChecklistItem={onUpdateChecklistItem}
-                  onDeleteChecklistItem={onDeleteChecklistItem}
-                  onClearChecklist={onClearChecklist}
-                  onDeleteTask={onDeleteTask}
-                  onUpdateTaskFund={onUpdateTaskFund}
-                  daysUntil={daysUntil}
-                />
-              ))}
-            </div>
+            {!collapsedFunds[fund] && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 items-start">
+                {items.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    onToggleTask={onToggleTask}
+                    onToggleChecklist={onToggleChecklist}
+                    onUpdateChecklistItem={onUpdateChecklistItem}
+                    onDeleteChecklistItem={onDeleteChecklistItem}
+                    onClearChecklist={onClearChecklist}
+                    onDeleteTask={onDeleteTask}
+                    onUpdateTaskFund={onUpdateTaskFund}
+                    onUpdateTaskTags={onUpdateTaskTags}
+                    onUpdateTaskDueDate={onUpdateTaskDueDate}
+                    daysUntil={daysUntil}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -629,6 +1144,8 @@ function TaskList({
               onClearChecklist={onClearChecklist}
               onDeleteTask={onDeleteTask}
               onUpdateTaskFund={onUpdateTaskFund}
+              onUpdateTaskTags={onUpdateTaskTags}
+              onUpdateTaskDueDate={onUpdateTaskDueDate}
               daysUntil={daysUntil}
             />
           )
@@ -662,6 +1179,8 @@ function TaskList({
               onClearChecklist={onClearChecklist}
               onDeleteTask={onDeleteTask}
               onUpdateTaskFund={onUpdateTaskFund}
+              onUpdateTaskTags={onUpdateTaskTags}
+              onUpdateTaskDueDate={onUpdateTaskDueDate}
               daysUntil={daysUntil}
             />
           ))}

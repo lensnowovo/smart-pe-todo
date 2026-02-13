@@ -432,6 +432,42 @@ export const TaskOperations = {
   },
 
   /**
+   * Update task tags
+   */
+  updateTags: (task, tags) => {
+    const cleaned = Array.isArray(tags)
+      ? [...new Set(tags.map((tag) => String(tag).trim()).filter(Boolean))]
+      : []
+    return {
+      ...task,
+      tags: cleaned,
+    }
+  },
+
+  /**
+   * Update task due date
+   */
+  updateDueDate: (task, dueDate) => {
+    const cleaned = String(dueDate || '').trim()
+    return {
+      ...task,
+      dueDate: cleaned || null,
+    }
+  },
+
+  /**
+   * Update task title
+   */
+  updateTitle: (task, title) => {
+    const cleaned = String(title || '').trim()
+    if (!cleaned) return task
+    return {
+      ...task,
+      title: cleaned,
+    }
+  },
+
+  /**
    * Move task to new date
    */
   moveToDate: (task, dayKey) => {

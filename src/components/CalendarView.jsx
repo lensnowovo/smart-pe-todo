@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   addDays,
   addMonths,
@@ -17,22 +17,11 @@ const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
 function CalendarView({
   selectedDate,
   onSelectDate,
-  tasks,
   tasksForDate,
   onMoveTaskDate,
   onOpenDate,
 }) {
   const [month, setMonth] = useState(startOfMonth(selectedDate))
-
-  const taskMap = useMemo(() => {
-    const map = new Map()
-    for (const task of tasks) {
-      if (!task.dueDate) continue
-      if (!map.has(task.dueDate)) map.set(task.dueDate, [])
-      map.get(task.dueDate).push(task)
-    }
-    return map
-  }, [tasks])
 
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 })
   const end = endOfWeek(endOfMonth(month), { weekStartsOn: 1 })
@@ -79,7 +68,6 @@ function CalendarView({
           const dayKey = format(day, 'yyyy-MM-dd')
           const inMonth = isSameMonth(day, month)
           const isSelected = isSameDay(day, selectedDate)
-          const dayTasks = taskMap.get(dayKey) || []
           const visibleTasks = tasksForDate(day)
           const previewTasks = visibleTasks.slice(0, 3)
           const moreCount = Math.max(visibleTasks.length - 3, 0)
@@ -105,8 +93,8 @@ function CalendarView({
                 <span className={`text-xs ${inMonth ? 'text-[var(--text-900)]' : 'text-slate-400'}`}>
                   {format(day, 'd')}
                 </span>
-                {dayTasks.length > 0 && (
-                  <span className="text-[10px] text-[var(--text-500)]">{dayTasks.length}</span>
+                {visibleTasks.length > 0 && (
+                  <span className="text-[10px] text-[var(--text-500)]">{visibleTasks.length}</span>
                 )}
               </div>
               <div className="mt-2 space-y-1">
@@ -117,9 +105,20 @@ function CalendarView({
                     onDragStart={(event) => {
                       event.dataTransfer.setData('text/task-id', task.id)
                     }}
-                    className="cursor-grab rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-[11px] text-[var(--text-700)]"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onSelectDate(day)
+                      onOpenDate(day, task.id)
+                    }}
+                    className={`cursor-grab rounded-lg border px-2 py-1 text-[11px] ${
+                      task.calendarType === 'completed'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : task.completed
+                          ? 'border-slate-200 bg-slate-100 text-slate-600'
+                          : 'border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-700)]'
+                    }`}
                   >
-                    {task.title}
+                    <span>{task.title}</span>
                   </div>
                 ))}
                 {moreCount > 0 && (
