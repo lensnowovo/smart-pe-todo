@@ -51,7 +51,7 @@ import {
   TaskFilters,
   TaskOperations,
 } from './domain/tasks/taskService'
-import { analyzeTaskInput } from './services/aiService'
+import { analyzeTaskInput, organizeNotes } from './services/aiService'
 import { loadGamificationData, saveGamificationData } from './domain/gamification/gamificationRepository'
 import { processTaskCompletion } from './domain/gamification/gamificationService'
 import { ACHIEVEMENT_DEFINITIONS } from './domain/gamification/achievementDefinitions'
@@ -682,6 +682,22 @@ function App() {
     )
   }
 
+  const handleUpdateTaskNotes = (taskId, notes) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? TaskOperations.updateNotes(task, notes) : t
+      )
+    )
+  }
+
+  const handleOrganizeNotes = async (taskId, notes, taskTitle) => {
+    const organized = await organizeNotes({ notes, taskTitle })
+    handleUpdateTaskNotes(taskId, organized)
+    return organized
+  }
+
   const handleMoveTaskMatrix = (taskId, quadrantKey) => {
     const quadrant = quadrantKey || 'q4'
     setTasks((prev) =>
@@ -1200,9 +1216,8 @@ function App() {
                   onUpdateTaskFund={handleUpdateTaskFund}
                   onUpdateTaskTags={handleUpdateTaskTags}
                   onUpdateTaskDueDate={handleUpdateTaskDueDate}
-                  onUpdateTaskStatus={handleUpdateTaskStatus}
-                  onUpdateTaskWaitingOn={handleUpdateTaskWaitingOn}
-                  onUpdateTaskFollowUpDate={handleUpdateTaskFollowUpDate}
+                  onUpdateTaskNotes={handleUpdateTaskNotes}
+                  onOrganizeNotes={handleOrganizeNotes}
                   daysUntil={daysUntil}
                 />
               </div>

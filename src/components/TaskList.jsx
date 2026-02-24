@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, Pencil, Trash2, X } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, Pencil, Trash2, X, RotateCcw, Sparkles, Loader2 } from 'lucide-react'
 import CardShell from './CardShell'
 
 const SLA_KEYWORDS = /(capital call|quarterly report|kyc|tax filing|报税|税务)/i
@@ -38,6 +38,8 @@ function TaskCard({
   onUpdateTaskFund,
   onUpdateTaskTags,
   onUpdateTaskDueDate,
+  onUpdateTaskNotes,
+  onOrganizeNotes,
   daysUntil,
 }) {
   const [editing, setEditing] = useState({ taskId: null, itemId: null })
@@ -57,6 +59,10 @@ function TaskCard({
   const [showUrgencyMenu, setShowUrgencyMenu] = useState(false)
   const urgencyMenuRef = useRef(null)
   const [collapsed, setCollapsed] = useState(false)
+  const [flipped, setFlipped] = useState(false)
+  const [notesDraft, setNotesDraft] = useState(task.notes || '')
+  const [organizing, setOrganizing] = useState(false)
+  const notesRef = useRef(null)
   const fundList = task.funds?.length ? task.funds : task.fund ? [task.fund] : []
   const tags = task.tags || []
   const riskLevel = getRiskLevel(task, daysUntil)
@@ -116,6 +122,30 @@ function TaskCard({
     onUpdateTaskDueDate(task.id, dueDateDraft)
     setEditingDueDate(false)
   }
+
+  const commitNotesDraft = () => {
+    if (onUpdateTaskNotes) {
+      onUpdateTaskNotes(task.id, notesDraft)
+    }
+  }
+
+  const handleOrganizeNotes = async () => {
+    if (!onOrganizeNotes || !notesDraft.trim()) return
+    setOrganizing(true)
+    try {
+      const organized = await onOrganizeNotes(task.id, notesDraft, task.title)
+      setNotesDraft(organized)
+    } catch (error) {
+      console.error('Failed to organize notes:', error)
+      alert('整理笔记失败: ' + error.message)
+    } finally {
+      setOrganizing(false)
+    }
+  }
+
+  useEffect(() => {
+    setNotesDraft(task.notes || '')
+  }, [task.notes])
 
   const toISODate = (date) => {
     const pad = (value) => String(value).padStart(2, '0')
@@ -208,6 +238,64 @@ function TaskCard({
   }, [showUrgencyMenu])
 
   const checklistTotal = task.checklist?.length || 0
+  const hasNotes = task.notes?.trim()
+
+  // Flipped card - back side with notes
+  if (flipped) {
+    return (
+      <CardShell className="h-auto">
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-sm font-semibold text-[var(--text-900)] truncate">{task.title}</p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  commitNotesDraft()
+                  setFlipped(false)
+                }}
+                className="rounded-md p-1.5 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
+                aria-label="翻转回正面"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <textarea
+              ref={notesRef}
+              value={notesDraft}
+              onChange={(event) => setNotesDraft(event.target.value)}
+              onBlur={() => commitNotesDraft()}
+              onClick={(event) => event.stopPropagation()}
+              placeholder="在这里添加笔记和备注..."
+              className="w-full min-h-[120px] rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text-700)] resize-y focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+            />
+            <div className="flex items-center justify-between">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleOrganizeNotes()
+                }}
+                disabled={organizing || !notesDraft.trim()}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {organizing ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {organizing ? '整理中...' : 'AI 整理笔记'}
+              </button>
+              <span className="text-xs text-[var(--text-500)]">
+                {notesDraft.length} 字符
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardShell>
+    )
+  }
 
   if (collapsed) {
     return (
@@ -234,6 +322,16 @@ function TaskCard({
               </p>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setFlipped(true)
+                }}
+                className={`rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)] ${hasNotes ? 'text-amber-600' : ''}`}
+                aria-label="查看笔记"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
               <button
                 onClick={(event) => {
                   event.stopPropagation()
@@ -275,6 +373,11 @@ function TaskCard({
                 子任务 {checklistTotal}
               </span>
             )}
+            {hasNotes && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5">
+                有笔记
+              </span>
+            )}
           </div>
         </div>
       </CardShell>
@@ -311,6 +414,16 @@ function TaskCard({
             </div>
           </div>
           <div className="flex items-center gap-2 text-xs text-[var(--text-500)]">
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                setFlipped(true)
+              }}
+              className={`rounded-md p-1 hover:bg-[var(--surface-2)] ${hasNotes ? 'text-amber-600' : 'text-[var(--text-500)] hover:text-[var(--text-900)]'}`}
+              aria-label="翻转查看笔记"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
             <button
               onClick={(event) => {
                 event.stopPropagation()
@@ -866,6 +979,8 @@ function TaskList({
   onUpdateTaskFund,
   onUpdateTaskTags,
   onUpdateTaskDueDate,
+  onUpdateTaskNotes,
+  onOrganizeNotes,
   daysUntil,
 }) {
   const [openGroupId, setOpenGroupId] = useState(null)
@@ -1084,6 +1199,8 @@ function TaskList({
                     onUpdateTaskFund={onUpdateTaskFund}
                     onUpdateTaskTags={onUpdateTaskTags}
                     onUpdateTaskDueDate={onUpdateTaskDueDate}
+                    onUpdateTaskNotes={onUpdateTaskNotes}
+                    onOrganizeNotes={onOrganizeNotes}
                     daysUntil={daysUntil}
                   />
                 ))}
@@ -1146,6 +1263,8 @@ function TaskList({
               onUpdateTaskFund={onUpdateTaskFund}
               onUpdateTaskTags={onUpdateTaskTags}
               onUpdateTaskDueDate={onUpdateTaskDueDate}
+              onUpdateTaskNotes={onUpdateTaskNotes}
+              onOrganizeNotes={onOrganizeNotes}
               daysUntil={daysUntil}
             />
           )
@@ -1181,6 +1300,8 @@ function TaskList({
               onUpdateTaskFund={onUpdateTaskFund}
               onUpdateTaskTags={onUpdateTaskTags}
               onUpdateTaskDueDate={onUpdateTaskDueDate}
+              onUpdateTaskNotes={onUpdateTaskNotes}
+              onOrganizeNotes={onOrganizeNotes}
               daysUntil={daysUntil}
             />
           ))}

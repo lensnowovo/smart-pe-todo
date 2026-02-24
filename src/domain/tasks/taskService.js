@@ -184,6 +184,7 @@ export const buildTaskPayload = (parsed) => {
     groupId: parsed.groupId || null,
     generatedFrom: parsed.generatedFrom || null,
     instanceNumber: parsed.instanceNumber || null,
+    notes: parsed.notes || '',
   }
 }
 
@@ -474,6 +475,16 @@ export const TaskOperations = {
     return {
       ...task,
       dueDate: dayKey,
+    }
+  },
+
+  /**
+   * Update task notes
+   */
+  updateNotes: (task, notes) => {
+    return {
+      ...task,
+      notes: notes || '',
     }
   },
 }

@@ -93,3 +93,40 @@ export const generateReportSummary = async ({ prompt, systemPrompt, model, provi
   }
   return String(content).trim()
 }
+
+const NOTES_ORGANIZE_PROMPT = `你是一个专业的笔记整理助手。请将用户提供的原始笔记整理成更有条理、更清晰的内容。
+
+整理要求：
+1. 保持原始信息的完整性，不要丢失任何重要内容
+2. 使用清晰的标题和段落结构
+3. 如果有列表或步骤，使用编号或项目符号
+4. 移除重复内容，合并相似要点
+5. 修正明显的语法和拼写错误
+6. 如果内容涉及任务或待办事项，可以适当分类
+7. 保持简洁，避免冗余
+
+请直接输出整理后的笔记内容，不要添加额外的解释或说明。`
+
+export const organizeNotes = async ({ notes, taskTitle, provider }) => {
+  if (!notes?.trim()) {
+    throw new Error('笔记内容为空')
+  }
+
+  const userPrompt = taskTitle
+    ? `任务标题：${taskTitle}\n\n原始笔记：\n${notes}`
+    : `原始笔记：\n${notes}`
+
+  const data = await requestChatCompletion({
+    provider,
+    messages: [
+      { role: 'system', content: NOTES_ORGANIZE_PROMPT },
+      { role: 'user', content: userPrompt },
+    ],
+  })
+
+  const content = data?.choices?.[0]?.message?.content
+  if (!content) {
+    throw new Error('AI 整理笔记失败')
+  }
+  return String(content).trim()
+}
