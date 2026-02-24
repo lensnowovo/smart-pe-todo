@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, ChevronDown, ChevronRight, Circle, Pencil, Trash2, X, RotateCcw, Sparkles, Loader2 } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Circle, Pencil, Trash2, X, RotateCcw, Sparkles, Loader2, Plus } from 'lucide-react'
 import CardShell from './CardShell'
+import { getQuadrantKey } from '../domain/tasks/taskService'
 
 const SLA_KEYWORDS = /(capital call|quarterly report|kyc|tax filing|报税|税务)/i
 
@@ -27,6 +28,78 @@ const riskTagStyles = {
   t7: 'border-slate-200 bg-slate-50 text-slate-700',
 }
 
+const quadrantStyles = {
+  q1: {
+    border: 'border-rose-300',
+    header: 'bg-rose-50',
+    badge: 'border-rose-200 bg-rose-50 text-rose-700',
+    label: '重要+紧急'
+  },
+  q2: {
+    border: 'border-amber-300',
+    header: 'bg-amber-50',
+    badge: 'border-amber-200 bg-amber-50 text-amber-700',
+    label: '重要+不紧急'
+  },
+  q3: {
+    border: 'border-orange-300',
+    header: 'bg-orange-50',
+    badge: 'border-orange-200 bg-orange-50 text-orange-700',
+    label: '不重要+紧急'
+  },
+  q4: {
+    border: 'border-slate-300',
+    header: 'bg-slate-50',
+    badge: 'border-slate-200 bg-slate-50 text-slate-700',
+    label: '不重要+不紧急'
+  }
+}
+
+// FlipCard wrapper component for 3D flip animation
+function FlipCard({ flipped, onFlip, children }) {
+  const handleDoubleClick = (e) => {
+    // Don't flip if clicking on interactive elements
+    if (e.target.closest('button, input, textarea, a')) return
+    onFlip?.()
+  }
+
+  return (
+    <div
+      className="relative w-full h-full"
+      style={{ perspective: '1000px' }}
+      onDoubleClick={handleDoubleClick}
+    >
+      <div
+        className="relative w-full transition-transform duration-500 ease-in-out"
+        style={{
+          transformStyle: 'preserve-3d',
+          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Front/Back face wrapper for flip animation
+function FlipCardFace({ isBack, children, className = '' }) {
+  return (
+    <div
+      className={`w-full h-full ${className}`}
+      style={{
+        backfaceVisibility: 'hidden',
+        position: isBack ? 'absolute' : 'relative',
+        top: 0,
+        left: 0,
+        transform: isBack ? 'rotateY(180deg)' : 'rotateY(0deg)',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 function TaskCard({
   task,
   onToggleTask,
@@ -34,6 +107,7 @@ function TaskCard({
   onUpdateChecklistItem,
   onDeleteChecklistItem,
   onClearChecklist,
+  onAddChecklistItem,
   onDeleteTask,
   onUpdateTaskFund,
   onUpdateTaskTags,
@@ -63,10 +137,15 @@ function TaskCard({
   const [notesDraft, setNotesDraft] = useState(task.notes || '')
   const [organizing, setOrganizing] = useState(false)
   const notesRef = useRef(null)
+  const [newChecklistText, setNewChecklistText] = useState('')
+  const [showAddChecklist, setShowAddChecklist] = useState(false)
+  const addChecklistRef = useRef(null)
   const fundList = task.funds?.length ? task.funds : task.fund ? [task.fund] : []
   const tags = task.tags || []
   const riskLevel = getRiskLevel(task, daysUntil)
   const riskTagClass = riskLevel ? riskTagStyles[riskLevel] : ''
+  const quadrant = getQuadrantKey(task)
+  const quadrantStyle = task.completed ? null : quadrantStyles[quadrant]
   const urgencyLabel = (() => {
     if (!task.dueDate) return '不紧急'
     const days = daysUntil(task.dueDate)
@@ -240,107 +319,224 @@ function TaskCard({
   const checklistTotal = task.checklist?.length || 0
   const hasNotes = task.notes?.trim()
 
-  // Flipped card - back side with notes
-  if (flipped) {
-    return (
-      <CardShell className="h-auto">
-        <div className="p-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <p className="text-sm font-semibold text-[var(--text-900)] truncate">{task.title}</p>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  commitNotesDraft()
-                  setFlipped(false)
-                }}
-                className="rounded-md p-1.5 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
-                aria-label="翻转回正面"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <textarea
-              ref={notesRef}
-              value={notesDraft}
-              onChange={(event) => setNotesDraft(event.target.value)}
-              onBlur={() => commitNotesDraft()}
-              onClick={(event) => event.stopPropagation()}
-              placeholder="在这里添加笔记和备注..."
-              className="w-full min-h-[120px] rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text-700)] resize-y focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
-            />
-            <div className="flex items-center justify-between">
-              <button
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleOrganizeNotes()
-                }}
-                disabled={organizing || !notesDraft.trim()}
-                className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {organizing ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                {organizing ? '整理中...' : 'AI 整理笔记'}
-              </button>
-              <span className="text-xs text-[var(--text-500)]">
-                {notesDraft.length} 字符
-              </span>
-            </div>
+  // Handle double click to toggle flip state
+  const handleDoubleClick = (event) => {
+    // Don't flip if clicking on interactive elements
+    if (event.target.closest('button, input, textarea, a, [contenteditable]')) return
+    if (flipped) {
+      commitNotesDraft()
+      setFlipped(false)
+    } else {
+      setFlipped(true)
+    }
+  }
+
+  // Back side content (notes)
+  const backContent = (
+    <CardShell className="h-[360px]" onDoubleClick={handleDoubleClick}>
+      <div className="p-4 h-full flex flex-col">
+        <div className="flex items-center justify-between gap-3 mb-3 shrink-0">
+          <p className="text-sm font-semibold text-[var(--text-900)] truncate">{task.title}</p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                commitNotesDraft()
+                setFlipped(false)
+              }}
+              className="rounded-md p-1.5 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
+              aria-label="翻转回正面"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
           </div>
         </div>
-      </CardShell>
+        <div className="flex-1 flex flex-col min-h-0">
+          <textarea
+            ref={notesRef}
+            value={notesDraft}
+            onChange={(event) => setNotesDraft(event.target.value)}
+            onBlur={() => commitNotesDraft()}
+            onClick={(event) => event.stopPropagation()}
+            placeholder="在这里添加笔记和备注..."
+            className="flex-1 w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--text-700)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30"
+          />
+          <div className="mt-3 flex items-center justify-between shrink-0">
+            <button
+              onClick={(event) => {
+                event.stopPropagation()
+                handleOrganizeNotes()
+              }}
+              disabled={organizing || !notesDraft.trim()}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-xs text-[var(--text-700)] hover:bg-[var(--surface-2)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {organizing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {organizing ? '整理中...' : 'AI 整理笔记'}
+            </button>
+            <span className="text-xs text-[var(--text-500)]">
+              {notesDraft.length} 字符
+            </span>
+          </div>
+        </div>
+      </div>
+    </CardShell>
+  )
+
+  // Collapsed front content
+  if (!flipped && collapsed) {
+    return (
+      <div
+        className="animate-flip-in"
+        style={{ animationDuration: '0.4s' }}
+        onDoubleClick={handleDoubleClick}
+      >
+        <CardShell className="h-auto">
+          <div className="p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-2">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onToggleTask(task.id)
+                  }}
+                  className="mt-0.5 text-[var(--accent)]"
+                  aria-label="Toggle task"
+                >
+                  {task.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                </button>
+                <p
+                  className={`min-w-0 truncate text-sm font-semibold ${
+                    task.completed ? 'line-through text-[var(--text-500)]' : 'text-[var(--text-900)]'
+                  }`}
+                >
+                  {task.title}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setFlipped(true)
+                  }}
+                  className={`rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)] ${hasNotes ? 'text-amber-600' : ''}`}
+                  aria-label="查看笔记"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setCollapsed(false)
+                  }}
+                  className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
+                  aria-label="展开任务卡片"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onDeleteTask(task.id)
+                  }}
+                  className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-rose-600"
+                  aria-label="删除任务"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-500)]">
+              {(fundList[0] || '未设置基金') && (
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5">
+                  {fundList[0] || '未设置基金'}
+                </span>
+              )}
+              <span className={`rounded-full border px-2 py-0.5 ${riskTagClass || 'border-[var(--border)]'}`}>
+                {urgencyLabel}
+              </span>
+              {task.dueDate && (
+                <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5">
+                  DDL {task.dueDate}
+                </span>
+              )}
+              {checklistTotal > 0 && (
+                <span className="rounded-full border border-[var(--border)] bg-white px-2 py-0.5">
+                  子任务 {checklistTotal}
+                </span>
+              )}
+              {hasNotes && (
+                <span className="rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5">
+                  有笔记
+                </span>
+              )}
+            </div>
+          </div>
+        </CardShell>
+      </div>
     )
   }
 
-  if (collapsed) {
-    return (
-      <CardShell className="h-auto">
-        <div className="p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-start gap-2">
+  // Unified flip card container with 3D animation
+  return (
+    <div
+      className="flip-card-container"
+      onDoubleClick={handleDoubleClick}
+    >
+      <div className={`flip-card-inner ${flipped ? 'flipped' : ''}`}>
+        {/* Front side */}
+        <div className="flip-card-front">
+      <CardShell className={quadrantStyle ? quadrantStyle.border : ''}>
+        <div className={`shrink-0 p-4 ${quadrantStyle ? quadrantStyle.header : ''}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
               <button
                 onClick={(event) => {
                   event.stopPropagation()
                   onToggleTask(task.id)
                 }}
-                className="mt-0.5 text-[var(--accent)]"
+                className="mt-1 text-[var(--accent)]"
                 aria-label="Toggle task"
               >
-                {task.completed ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                {task.completed ? (
+                  <CheckCircle2 className="h-5 w-5" />
+                ) : (
+                  <Circle className="h-5 w-5" />
+                )}
               </button>
-              <p
-                className={`min-w-0 truncate text-sm font-semibold ${
-                  task.completed ? 'line-through text-[var(--text-500)]' : 'text-[var(--text-900)]'
-                }`}
-              >
-                {task.title}
-              </p>
+              <div className="min-w-0">
+                <p
+                  className={`text-sm font-semibold ${
+                    task.completed ? 'line-through text-[var(--text-500)]' : 'text-[var(--text-900)]'
+                  }`}
+                >
+                  {task.title}
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 text-xs text-[var(--text-500)]">
               <button
                 onClick={(event) => {
                   event.stopPropagation()
                   setFlipped(true)
                 }}
-                className={`rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)] ${hasNotes ? 'text-amber-600' : ''}`}
-                aria-label="查看笔记"
+                className={`rounded-md p-1 hover:bg-[var(--surface-2)] ${hasNotes ? 'text-amber-600' : 'text-[var(--text-500)] hover:text-[var(--text-900)]'}`}
+                aria-label="翻转查看笔记"
               >
                 <Pencil className="h-4 w-4" />
               </button>
               <button
                 onClick={(event) => {
                   event.stopPropagation()
-                  setCollapsed(false)
+                  setCollapsed((prev) => !prev)
                 }}
                 className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
-                aria-label="展开任务卡片"
+                aria-label={collapsed ? '展开任务卡片' : '折叠任务卡片'}
               >
-                <ChevronRight className="h-4 w-4" />
+                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </button>
               <button
                 onClick={(event) => {
@@ -354,99 +550,7 @@ function TaskCard({
               </button>
             </div>
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-500)]">
-            {(fundList[0] || '未设置基金') && (
-              <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5">
-                {fundList[0] || '未设置基金'}
-              </span>
-            )}
-            <span className={`rounded-full border px-2 py-0.5 ${riskTagClass || 'border-[var(--border)]'}`}>
-              {urgencyLabel}
-            </span>
-            {task.dueDate && (
-              <span className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5">
-                DDL {task.dueDate}
-              </span>
-            )}
-            {checklistTotal > 0 && (
-              <span className="rounded-full border border-[var(--border)] bg-white px-2 py-0.5">
-                子任务 {checklistTotal}
-              </span>
-            )}
-            {hasNotes && (
-              <span className="rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-2 py-0.5">
-                有笔记
-              </span>
-            )}
-          </div>
         </div>
-      </CardShell>
-    )
-  }
-
-  return (
-    <CardShell>
-      <div className="shrink-0 p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            <button
-              onClick={(event) => {
-                event.stopPropagation()
-                onToggleTask(task.id)
-              }}
-              className="mt-1 text-[var(--accent)]"
-              aria-label="Toggle task"
-            >
-              {task.completed ? (
-                <CheckCircle2 className="h-5 w-5" />
-              ) : (
-                <Circle className="h-5 w-5" />
-              )}
-            </button>
-            <div className="min-w-0">
-              <p
-                className={`text-sm font-semibold ${
-                  task.completed ? 'line-through text-[var(--text-500)]' : 'text-[var(--text-900)]'
-                }`}
-              >
-                {task.title}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[var(--text-500)]">
-            <button
-              onClick={(event) => {
-                event.stopPropagation()
-                setFlipped(true)
-              }}
-              className={`rounded-md p-1 hover:bg-[var(--surface-2)] ${hasNotes ? 'text-amber-600' : 'text-[var(--text-500)] hover:text-[var(--text-900)]'}`}
-              aria-label="翻转查看笔记"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              onClick={(event) => {
-                event.stopPropagation()
-                setCollapsed((prev) => !prev)
-              }}
-              className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-[var(--text-900)]"
-              aria-label={collapsed ? '展开任务卡片' : '折叠任务卡片'}
-            >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={(event) => {
-                event.stopPropagation()
-                onDeleteTask(task.id)
-              }}
-              className="rounded-md p-1 text-[var(--text-500)] hover:bg-[var(--surface-2)] hover:text-rose-600"
-              aria-label="删除任务"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-3 scrollbar-auto">
         <div className="flex flex-wrap gap-2 text-xs text-[var(--text-500)]">
@@ -497,6 +601,11 @@ function TaskCard({
             >
               <span>{fundList.join(', ')}</span>
             </button>
+          )}
+          {!task.completed && quadrantStyle && (
+            <span className={`rounded-full border px-2 py-1 ${quadrantStyle.badge}`}>
+              {quadrantStyle.label}
+            </span>
           )}
           {task.portfolio?.map((name) => (
             <span
@@ -793,8 +902,55 @@ function TaskCard({
             })}
           </div>
         )}
+        {/* Add new subtask input */}
+        <div className="mt-2" ref={addChecklistRef}>
+          {showAddChecklist ? (
+            <div className="flex items-center gap-2">
+              <Circle className="h-4 w-4 text-[var(--text-400)]" />
+              <input
+                value={newChecklistText}
+                autoFocus
+                onChange={(e) => setNewChecklistText(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newChecklistText.trim()) {
+                    onAddChecklistItem(task.id, newChecklistText)
+                    setNewChecklistText('')
+                  }
+                  if (e.key === 'Escape') {
+                    setShowAddChecklist(false)
+                    setNewChecklistText('')
+                  }
+                }}
+                className="flex-1 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs text-[var(--text-700)]"
+                placeholder="添加子任务..."
+              />
+            </div>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowAddChecklist(true)
+              }}
+              className="flex items-center gap-2 w-full rounded-lg border border-dashed border-[var(--border)] px-3 py-2 text-xs text-[var(--text-500)] hover:border-[var(--accent)]/40 hover:text-[var(--text-900)]"
+            >
+              <Plus className="h-4 w-4" />
+              添加子任务
+            </button>
+          )}
+        </div>
       </div>
     </CardShell>
+        </div>
+        {/* Back side */}
+        <div
+          className="flip-card-back"
+          style={{ transform: 'rotateY(180deg)' }}
+        >
+          {backContent}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -975,6 +1131,7 @@ function TaskList({
   onUpdateChecklistItem,
   onDeleteChecklistItem,
   onClearChecklist,
+  onAddChecklistItem,
   onDeleteTask,
   onUpdateTaskFund,
   onUpdateTaskTags,
@@ -1001,10 +1158,35 @@ function TaskList({
 
   const showRiskBanner = view === 'inbox' && riskTotal > 0
 
+  // Sort tasks: incomplete first (by quadrant priority), completed at bottom
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => {
+      // Completed tasks go to the bottom
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1
+      }
+
+      // Among incomplete tasks, sort by quadrant (q1 > q2 > q3 > q4)
+      if (!a.completed && !b.completed) {
+        const quadrantOrder = { q1: 0, q2: 1, q3: 2, q4: 3 }
+        const aQuadrant = getQuadrantKey(a)
+        const bQuadrant = getQuadrantKey(b)
+        return quadrantOrder[aQuadrant] - quadrantOrder[bQuadrant]
+      }
+
+      // Among completed tasks, sort by completion date (most recent first)
+      if (a.completedDate && b.completedDate) {
+        return new Date(b.completedDate) - new Date(a.completedDate)
+      }
+
+      return 0
+    })
+  }, [tasks])
+
   const groupedList = useMemo(() => {
     const order = []
     const map = new Map()
-    for (const task of tasks) {
+    for (const task of sortedTasks) {
       if (task.groupId) {
         if (!map.has(task.groupId)) {
           map.set(task.groupId, [])
@@ -1016,7 +1198,7 @@ function TaskList({
       }
     }
     return { order, map }
-  }, [tasks])
+  }, [sortedTasks])
 
   const openGroup = openGroupId ? groupedList.map.get(openGroupId) : null
   const openGroupTitle = openGroup?.[0]?.title || '批次任务'
@@ -1195,6 +1377,7 @@ function TaskList({
                     onUpdateChecklistItem={onUpdateChecklistItem}
                     onDeleteChecklistItem={onDeleteChecklistItem}
                     onClearChecklist={onClearChecklist}
+                    onAddChecklistItem={onAddChecklistItem}
                     onDeleteTask={onDeleteTask}
                     onUpdateTaskFund={onUpdateTaskFund}
                     onUpdateTaskTags={onUpdateTaskTags}
@@ -1259,6 +1442,7 @@ function TaskList({
               onUpdateChecklistItem={onUpdateChecklistItem}
               onDeleteChecklistItem={onDeleteChecklistItem}
               onClearChecklist={onClearChecklist}
+              onAddChecklistItem={onAddChecklistItem}
               onDeleteTask={onDeleteTask}
               onUpdateTaskFund={onUpdateTaskFund}
               onUpdateTaskTags={onUpdateTaskTags}
@@ -1296,6 +1480,7 @@ function TaskList({
               onUpdateChecklistItem={onUpdateChecklistItem}
               onDeleteChecklistItem={onDeleteChecklistItem}
               onClearChecklist={onClearChecklist}
+              onAddChecklistItem={onAddChecklistItem}
               onDeleteTask={onDeleteTask}
               onUpdateTaskFund={onUpdateTaskFund}
               onUpdateTaskTags={onUpdateTaskTags}

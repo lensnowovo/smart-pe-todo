@@ -370,7 +370,6 @@ function ReportView({ tasks }) {
   }
 
   const buildAiPrompt = () => {
-    const typeLines = computed.typeTop.map(([name, count]) => `- ${name}: ${count}`).join('\n')
     const fundLines = computed.fundTop.map(([name, count]) => `- ${name}: ${count}`).join('\n')
     const waitingLines = computed.waitingTop.map(([name, count]) => `- ${name}: ${count}`).join('\n')
     const overdueLines = computed.overdueTasks
@@ -378,7 +377,7 @@ function ReportView({ tasks }) {
       .map((task) => `- ${task.title}（${task.dueDate || '无截止日期'}）`)
       .join('\n')
 
-    return `请基于以下数据，生成一份客观简洁的${computed.rangeLabel}工作报告，使用 Markdown 输出，包含：\n\n1) 本期概况（1-2句）\n2) 完成情况摘要（列表）\n3) 风险与待跟进（列表）\n4) 下期关注建议（列表）\n\n数据摘要：\n- 已完成：${computed.completedCount}\n- 进行中：${computed.inProgressCount}\n- 逾期：${computed.overdueCount}\n- 等待中：${computed.blockedCount}\n- 完成率：${computed.completionRate}%\n\n任务类型分布：\n${typeLines || '—'}\n\n基金分布：\n${fundLines || '—'}\n\n阻塞原因：\n${waitingLines || '—'}\n\n逾期任务（最多5条）：\n${overdueLines || '—'}\n`
+    return `请基于以下任务数据，生成一份按基金分类的${computed.rangeLabel}工作报告。\n\n格式要求（严格按此格式）：\n一、基金名1：\n任务名称：当前状态/进展描述\n任务名称：当前状态/进展描述\n\n二、基金名2：\n任务名称：当前状态/进展描述\n\n三、其他运营工作\n1、日常事项1；\n2、日常事项2。\n\n注意：\n- 只输出任务进展，不要概况、总结、建议\n- 按基金分组，每个任务一行\n- 无基金归属的任务放入"其他运营工作"\n\n基金分布：\n${fundLines || '—'}\n\n逾期任务（最多5条）：\n${overdueLines || '—'}\n\n阻塞/等待中事项：\n${waitingLines || '—'}\n`
   }
 
   const handleGenerateAi = async () => {
@@ -389,7 +388,7 @@ function ReportView({ tasks }) {
       const report = await generateReportSummary({
         model: activeProvider?.model,
         provider: activeProvider,
-        systemPrompt: '你是私募股权基金运营的工作报告助手，输出客观简洁的中文周报。',
+        systemPrompt: '你是私募股权基金运营的工作报告助手。请按基金维度分类整理工作进展，输出简洁专业的中文周报，只输出具体任务进展，不要添加概况、总结或建议。',
         prompt: buildAiPrompt(),
       })
       setAiReport(report)

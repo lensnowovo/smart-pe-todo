@@ -604,6 +604,14 @@ function App() {
     )
   }
 
+  const handleAddChecklistItem = (taskId, text) => {
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === taskId ? TaskOperations.addChecklistItem(task, text) : task
+      )
+    )
+  }
+
   const handleDeleteTask = (taskId) => {
     const ok = window.confirm('确定要删除该任务吗？')
     if (!ok) return
@@ -1212,6 +1220,7 @@ function App() {
                   onUpdateChecklistItem={handleUpdateChecklistItem}
                   onDeleteChecklistItem={handleDeleteChecklistItem}
                   onClearChecklist={handleClearChecklist}
+                  onAddChecklistItem={handleAddChecklistItem}
                   onDeleteTask={handleDeleteTask}
                   onUpdateTaskFund={handleUpdateTaskFund}
                   onUpdateTaskTags={handleUpdateTaskTags}

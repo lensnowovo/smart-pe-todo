@@ -421,6 +421,25 @@ export const TaskOperations = {
   },
 
   /**
+   * Add checklist item
+   */
+  addChecklistItem: (task, text) => {
+    const cleaned = text.trim()
+    if (!cleaned) return task
+    return {
+      ...task,
+      checklist: [
+        ...task.checklist,
+        {
+          id: `${Date.now()}-${crypto?.randomUUID?.() || Math.random().toString(16).slice(2)}`,
+          text: cleaned,
+          done: false,
+        },
+      ],
+    }
+  },
+
+  /**
    * Update task fund
    */
   updateFund: (task, fund) => {
