@@ -103,6 +103,7 @@ body {
 /* 3D Flip animation */
 .flip-card-container {
   perspective: 1000px;
+  height: 360px;
 }
 
 .flip-card-inner {

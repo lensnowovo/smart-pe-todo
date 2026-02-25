@@ -70,7 +70,7 @@ function FlipCard({ flipped, onFlip, children }) {
       onDoubleClick={handleDoubleClick}
     >
       <div
-        className="relative w-full transition-transform duration-500 ease-in-out"
+        className="relative w-full h-full transition-transform duration-500 ease-in-out"
         style={{
           transformStyle: 'preserve-3d',
           transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
@@ -1200,6 +1200,20 @@ function TaskList({
     return { order, map }
   }, [sortedTasks])
 
+  // Group tasks by quadrant for inbox view (only incomplete tasks)
+  const quadrantBucketsForInbox = useMemo(() => {
+    const buckets = { q1: [], q2: [], q3: [], q4: [], completed: [] }
+    for (const task of sortedTasks) {
+      if (task.completed) {
+        buckets.completed.push(task)
+      } else {
+        const q = getQuadrantKey(task)
+        buckets[q].push(task)
+      }
+    }
+    return buckets
+  }, [sortedTasks])
+
   const openGroup = openGroupId ? groupedList.map.get(openGroupId) : null
   const openGroupTitle = openGroup?.[0]?.title || '批次任务'
 
@@ -1396,7 +1410,7 @@ function TaskList({
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       {showRiskBanner && (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           <span className="font-semibold">风险提示</span>
@@ -1425,18 +1439,18 @@ function TaskList({
           </div>
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
-        {tasks.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-1)] p-6 text-sm text-[var(--text-500)]">
-            当前视图暂无任务。
-          </div>
-        )}
-      {groupedList.order.map((item) => {
-        if (item.type === 'task') {
-          return (
+      {tasks.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-1)] p-6 text-sm text-[var(--text-500)]">
+          当前视图暂无任务。
+        </div>
+      )}
+      {/* Q1: Important + Urgent */}
+      {quadrantBucketsForInbox.q1.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
+          {quadrantBucketsForInbox.q1.map((task) => (
             <TaskCard
-              key={item.task.id}
-              task={item.task}
+              key={task.id}
+              task={task}
               onToggleTask={onToggleTask}
               onToggleChecklist={onToggleChecklist}
               onUpdateChecklistItem={onUpdateChecklistItem}
@@ -1451,20 +1465,105 @@ function TaskList({
               onOrganizeNotes={onOrganizeNotes}
               daysUntil={daysUntil}
             />
-          )
-        }
-
-        const groupTasks = groupedList.map.get(item.id) || []
-        return (
-          <GroupCard
-            key={item.id}
-            group={{ id: item.id, tasks: groupTasks }}
-            onOpen={setOpenGroupId}
-            daysUntil={daysUntil}
-          />
-        )
-      })}
-      </div>
+          ))}
+        </div>
+      )}
+      {/* Q2: Important + Not Urgent */}
+      {quadrantBucketsForInbox.q2.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
+          {quadrantBucketsForInbox.q2.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onToggleTask={onToggleTask}
+              onToggleChecklist={onToggleChecklist}
+              onUpdateChecklistItem={onUpdateChecklistItem}
+              onDeleteChecklistItem={onDeleteChecklistItem}
+              onClearChecklist={onClearChecklist}
+              onAddChecklistItem={onAddChecklistItem}
+              onDeleteTask={onDeleteTask}
+              onUpdateTaskFund={onUpdateTaskFund}
+              onUpdateTaskTags={onUpdateTaskTags}
+              onUpdateTaskDueDate={onUpdateTaskDueDate}
+              onUpdateTaskNotes={onUpdateTaskNotes}
+              onOrganizeNotes={onOrganizeNotes}
+              daysUntil={daysUntil}
+            />
+          ))}
+        </div>
+      )}
+      {/* Q3: Not Important + Urgent */}
+      {quadrantBucketsForInbox.q3.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
+          {quadrantBucketsForInbox.q3.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onToggleTask={onToggleTask}
+              onToggleChecklist={onToggleChecklist}
+              onUpdateChecklistItem={onUpdateChecklistItem}
+              onDeleteChecklistItem={onDeleteChecklistItem}
+              onClearChecklist={onClearChecklist}
+              onAddChecklistItem={onAddChecklistItem}
+              onDeleteTask={onDeleteTask}
+              onUpdateTaskFund={onUpdateTaskFund}
+              onUpdateTaskTags={onUpdateTaskTags}
+              onUpdateTaskDueDate={onUpdateTaskDueDate}
+              onUpdateTaskNotes={onUpdateTaskNotes}
+              onOrganizeNotes={onOrganizeNotes}
+              daysUntil={daysUntil}
+            />
+          ))}
+        </div>
+      )}
+      {/* Q4: Not Important + Not Urgent */}
+      {quadrantBucketsForInbox.q4.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
+          {quadrantBucketsForInbox.q4.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onToggleTask={onToggleTask}
+              onToggleChecklist={onToggleChecklist}
+              onUpdateChecklistItem={onUpdateChecklistItem}
+              onDeleteChecklistItem={onDeleteChecklistItem}
+              onClearChecklist={onClearChecklist}
+              onAddChecklistItem={onAddChecklistItem}
+              onDeleteTask={onDeleteTask}
+              onUpdateTaskFund={onUpdateTaskFund}
+              onUpdateTaskTags={onUpdateTaskTags}
+              onUpdateTaskDueDate={onUpdateTaskDueDate}
+              onUpdateTaskNotes={onUpdateTaskNotes}
+              onOrganizeNotes={onOrganizeNotes}
+              daysUntil={daysUntil}
+            />
+          ))}
+        </div>
+      )}
+      {/* Completed tasks */}
+      {quadrantBucketsForInbox.completed.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 items-start">
+          {quadrantBucketsForInbox.completed.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onToggleTask={onToggleTask}
+              onToggleChecklist={onToggleChecklist}
+              onUpdateChecklistItem={onUpdateChecklistItem}
+              onDeleteChecklistItem={onDeleteChecklistItem}
+              onClearChecklist={onClearChecklist}
+              onAddChecklistItem={onAddChecklistItem}
+              onDeleteTask={onDeleteTask}
+              onUpdateTaskFund={onUpdateTaskFund}
+              onUpdateTaskTags={onUpdateTaskTags}
+              onUpdateTaskDueDate={onUpdateTaskDueDate}
+              onUpdateTaskNotes={onUpdateTaskNotes}
+              onOrganizeNotes={onOrganizeNotes}
+              daysUntil={daysUntil}
+            />
+          ))}
+        </div>
+      )}
       <GroupModal
         open={Boolean(openGroupId)}
         group={{ title: openGroupTitle }}
